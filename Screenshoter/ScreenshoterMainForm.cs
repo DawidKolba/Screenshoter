@@ -2,13 +2,13 @@ using ScreenShoterHelper;
 
 namespace ScreenshoterForm
 {
-    public partial class Form1 : Form
+    public partial class ScreenshoterMainForm : Form
     {
         private ShortcutManager _shortcutManager;
         private NotifyIcon trayIcon;
         private ContextMenuStrip trayMenu;
 
-        public Form1()
+        public ScreenshoterMainForm()
         {
             InitializeComponent();
             qualityTextbox.Text = "70";
@@ -64,9 +64,11 @@ namespace ScreenshoterForm
             trayIcon.Visible = false; // Ukrycie ikony w zasobniku
             Application.Exit(); // Zamkniêcie aplikacji
         }
-        private void StartSeriesCapture()
+
+        private async void StartSeriesCapture()
         {
-            // Logika dla F12
+            ToggleMainWindow();
+            await TakeMultipleScreenshots();
         }
 
         private void ToggleMainWindow()
@@ -76,9 +78,28 @@ namespace ScreenshoterForm
 
         private void StartAutomaticCapture()
         {
-            // Logika dla F8
+            ToggleMainWindow();
         }
 
+        public async Task TakeMultipleScreenshots()
+        {
+            int countOfImages = int.Parse(CountOfImagesTb.Text);
+            int delayBetweenPhotos = int.Parse(delayBetweenThePhotos.Text) ; 
+
+            for (int i = 0; i < countOfImages; i++)
+            {
+                string screenshotPath = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    $"TestScreenshot_{DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-ffffff")}");
+
+                await ScreenShoter.TakeScreenshot(screenshotPath, int.Parse(qualityTextbox.Text));
+
+                if (i < countOfImages - 1) // Avoid delay after the last screenshot
+                {
+                    await Task.Delay(delayBetweenPhotos);
+                }
+            }
+        }
 
         private void TryRegisterShortcut(Keys keys, Action action)
         {
@@ -137,7 +158,12 @@ namespace ScreenshoterForm
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
             if (checkBox1.Checked) { panel1.Enabled = true; panel1.Visible = true; }
-           else { panel1.Enabled = false; panel1.Visible = false; }
+            else { panel1.Enabled = false; panel1.Visible = false; }
+        }
+
+        private async void button1_Click_1(object sender, EventArgs e)
+        {
+            await TakeMultipleScreenshots();
         }
     }
 }
