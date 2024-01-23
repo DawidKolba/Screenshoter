@@ -1,15 +1,38 @@
 ﻿using ScreenshoterForm.ScreenShoterHelper;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Screenshoter.SystemHelper
 {
     public static class CleanupManager
     {
-        public static void CleanUpOldScreenshots(int DeleteOldFilesIfOlderThan)
+        static System.Timers.Timer CleanUpTimer = new System.Timers.Timer();
+
+        public static async void StartCleanUpOldScreenshots(int DeleteOldFilesIfOlderThan)
+        {
+            if (CleanUpTimer.Enabled)
+            {
+                CleanUpTimer.Stop();
+                CleanUpTimer.Start();
+            }
+            else
+            {
+                await CleanUpOldScreenshots(DeleteOldFilesIfOlderThan);
+
+                CleanUpTimer.Interval = DeleteOldFilesIfOlderThan;
+                CleanUpTimer.Elapsed += async (sender, e) =>
+                {
+                    await CleanUpOldScreenshots(DeleteOldFilesIfOlderThan);
+                };
+
+                CleanUpTimer.Start();
+            }
+        }
+
+        public static void StopCleaningUp()
+        {
+            CleanUpTimer.Stop();
+        }
+
+        private static async Task CleanUpOldScreenshots(int DeleteOldFilesIfOlderThan)
         {
             var targetDirectory = Options.ScreenshotOutputDirectory;
             var cutoffDate = DateTime.Now.AddDays(DeleteOldFilesIfOlderThan);
@@ -18,7 +41,7 @@ namespace Screenshoter.SystemHelper
             {
                 if (File.GetCreationTime(file) < cutoffDate)
                 {
-                    File.Delete(file);
+                    await Task.Run(() => File.Delete(file));
                 }
             }
 
@@ -26,9 +49,9 @@ namespace Screenshoter.SystemHelper
             {
                 if (Directory.GetCreationTime(directory) < cutoffDate && Directory.GetFiles(directory).Length == 0)
                 {
-                    Directory.Delete(directory);
+                    await Task.Run(() => Directory.Delete(directory));
                 }
-            }
+            }             
         }
     }
 }

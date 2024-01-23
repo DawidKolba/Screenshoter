@@ -1,4 +1,7 @@
+using Screenshoter.SystemHelper;
+using ScreenshoterForm.ScreenShoterHelper;
 using ScreenShoterHelper;
+using System.Configuration;
 
 namespace ScreenshoterForm
 {
@@ -11,10 +14,8 @@ namespace ScreenshoterForm
         public ScreenshoterMainForm()
         {
             InitializeComponent();
-            qualityTextbox.Text = "70";
-            delayBetweenThePhotos.Text = "1000";
             _shortcutManager = new ShortcutManager(this.Handle);
-            panel1.Enabled = false; panel1.Visible = false;
+            deleteOldFilesPanel.Enabled = false; deleteOldFilesPanel.Visible = false;
             TryRegisterShortcut(Keys.F11, StartSeriesCapture);
             TryRegisterShortcut(Keys.Control | Keys.H, ToggleMainWindow);
             TryRegisterShortcut(Keys.F8, StartAutomaticCapture);
@@ -30,10 +31,32 @@ namespace ScreenshoterForm
 
             trayIcon.MouseDoubleClick += TrayIcon_MouseDoubleClick;
             this.Resize += MainForm_Resize;
+            LoadConfig();
         }
         private void MainForm_Resize(object sender, EventArgs e)
         {
             MainForm_Resize();
+        }
+
+        public void LoadConfig()
+        {
+            qualityTextbox.Text = ConfigurationManager.AppSettings["Quality"];
+            delayBetweenThePhotos.Text = ConfigurationManager.AppSettings["DelayBetweenPhotos"];
+            CountOfImagesTb.Text = ConfigurationManager.AppSettings["CountOfImages"];
+            deleteOldFilesIfOlderThan.Text = ConfigurationManager.AppSettings["DeleteOldFilesIfOlderThan"];
+        }
+
+        public void SaveConfig()
+        {
+            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+
+            config.AppSettings.Settings["Quality"].Value = qualityTextbox.Text;
+            config.AppSettings.Settings["DelayBetweenPhotos"].Value = delayBetweenThePhotos.Text;
+            config.AppSettings.Settings["CountOfImages"].Value = CountOfImagesTb.Text;
+            config.AppSettings.Settings["DeleteOldFilesIfOlderThan"].Value = deleteOldFilesIfOlderThan.Text;
+
+            config.Save(ConfigurationSaveMode.Modified);
+            ConfigurationManager.RefreshSection("appSettings");
         }
 
         private void MainForm_Resize()
@@ -61,14 +84,18 @@ namespace ScreenshoterForm
 
         private void ExitApplication(object sender, EventArgs e)
         {
-            trayIcon.Visible = false; // Ukrycie ikony w zasobniku
-            Application.Exit(); // Zamkniêcie aplikacji
+            trayIcon.Visible = false;
+            Application.Exit();
         }
 
         private async void StartSeriesCapture()
         {
             ToggleMainWindow();
-            await TakeMultipleScreenshots();
+            int countOfImages = int.Parse(CountOfImagesTb.Text);
+            int delayBetweenPhotos = int.Parse(delayBetweenThePhotos.Text);
+            int quality = int.Parse(qualityTextbox.Text);
+
+            await ScreenShoter.TakeMultipleScreenshots(countOfImages, delayBetweenPhotos, quality);
         }
 
         private void ToggleMainWindow()
@@ -79,26 +106,6 @@ namespace ScreenshoterForm
         private void StartAutomaticCapture()
         {
             ToggleMainWindow();
-        }
-
-        public async Task TakeMultipleScreenshots()
-        {
-            int countOfImages = int.Parse(CountOfImagesTb.Text);
-            int delayBetweenPhotos = int.Parse(delayBetweenThePhotos.Text) ; 
-
-            for (int i = 0; i < countOfImages; i++)
-            {
-                string screenshotPath = Path.Combine(
-                    Directory.GetCurrentDirectory(),
-                    $"TestScreenshot_{DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-ffffff")}");
-
-                await ScreenShoter.TakeScreenshot(screenshotPath, int.Parse(qualityTextbox.Text));
-
-                if (i < countOfImages - 1) // Avoid delay after the last screenshot
-                {
-                    await Task.Delay(delayBetweenPhotos);
-                }
-            }
         }
 
         private void TryRegisterShortcut(Keys keys, Action action)
@@ -113,20 +120,19 @@ namespace ScreenshoterForm
                 _shortcutManager.RegisterShortcut(Keys.F12, StartSeriesCapture);
                 _shortcutManager.RegisterShortcut(Keys.Control | Keys.H, ToggleMainWindow);
                 _shortcutManager.RegisterShortcut(Keys.F8, StartAutomaticCapture);
-
             }
         }
 
-        private async void button1_Click(object sender, EventArgs e)
+        private async void takeSingleScreenshot_Click(object sender, EventArgs e)
         {
             await ScreenShoter.TakeScreenshot(
                    Path.Combine
-                       (Directory.GetCurrentDirectory(), $"TestScreenshot_{DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-ffffff")}"),
+                       (Options.ScreenshotOutputDirectory, $"TestScreenshot_{DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-ffffff")}"),
                         int.Parse(qualityTextbox.Text)
                        );
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void startScreenshoting_Click(object sender, EventArgs e)
         {
             ScreenShoter.StartScreenCapture(
                 int.Parse(qualityTextbox.Text),
@@ -157,13 +163,39 @@ namespace ScreenshoterForm
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
-            if (checkBox1.Checked) { panel1.Enabled = true; panel1.Visible = true; }
-            else { panel1.Enabled = false; panel1.Visible = false; }
+            if (removeoldPhotosCb.Checked)
+            {
+                try
+                {
+                    deleteOldFilesPanel.Enabled = true;
+                    deleteOldFilesPanel.Visible = true;
+                    CleanupManager.StartCleanUpOldScreenshots(int.Parse(deleteOldFilesIfOlderThan.Text));
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"{ex}");
+                }
+            }
+            else
+            {
+                deleteOldFilesPanel.Enabled = false;
+                deleteOldFilesPanel.Visible = false;
+                CleanupManager.StopCleaningUp();
+            }
         }
 
-        private async void button1_Click_1(object sender, EventArgs e)
+        private async void manualSeriesScreenshotBtn_Click(object sender, EventArgs e)
         {
-            await TakeMultipleScreenshots();
+            int countOfImages = int.Parse(CountOfImagesTb.Text);
+            int delayBetweenPhotos = int.Parse(delayBetweenThePhotos.Text);
+            int quality = int.Parse(qualityTextbox.Text);
+
+            await ScreenShoter.TakeMultipleScreenshots(countOfImages, delayBetweenPhotos, quality);
+        }
+
+        private void saveCfg_Click(object sender, EventArgs e)
+        {
+            SaveConfig();
         }
     }
 }

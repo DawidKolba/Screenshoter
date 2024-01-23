@@ -15,6 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="App.config">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
     <None Update="appicon.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

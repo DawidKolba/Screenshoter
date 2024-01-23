@@ -1,13 +1,15 @@
 ﻿using ScreenshoterForm.ScreenShoterHelper;
-using System.Timers;
 
 namespace ScreenShoterHelper
 {
     public static class ScreenShoter
     {
         static System.Timers.Timer CaptureScreenTimer = new System.Timers.Timer();
+
         public static async Task TakeScreenshot(string path, int quality)
         {
+            if (!Directory.Exists(Options.ScreenshotOutputDirectory)) { Directory.CreateDirectory(Options.ScreenshotOutputDirectory); }
+
             using (var capture = new ScreenCapture())
             {
                 await capture.CaptureScreens(path, quality);
@@ -19,6 +21,25 @@ namespace ScreenShoterHelper
             CaptureScreenTimer.Stop();
         }
 
+        public static async Task TakeMultipleScreenshots(int countOfImages, int delayBetweenPhotos, int quality)
+        {
+            if (!Directory.Exists(Options.ScreenshotOutputDirectory)) { Directory.CreateDirectory(Options.ScreenshotOutputDirectory); }
+         
+            for (int i = 0; i < countOfImages; i++)
+            {
+                string screenshotPath = Path.Combine(
+                    Options.ScreenshotOutputDirectory,
+                    $"TestScreenshot_{DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-ffffff")}");
+
+                await ScreenShoter.TakeScreenshot(screenshotPath, quality);
+
+                if (i < countOfImages - 1) // Avoid delay after the last screenshot
+                {
+                    await Task.Delay(delayBetweenPhotos);
+                }
+            }
+        }
+
         public static void StartScreenCapture(int quality, int delayInMs)
         {
             PrepareOutputDirectory();
@@ -26,11 +47,10 @@ namespace ScreenShoterHelper
             if (CaptureScreenTimer.Enabled)
                 CaptureScreenTimer.Stop();
 
-            //CaptureScreenTimer.Elapsed += new  ElapsedEventHandler(CaptureScreenLogic(quality));
             CaptureScreenTimer.Elapsed += async (sender, e) =>
-            {
-                await CaptureScreenLogic(Path.Combine(Options.ScreenshotOutputDirectory, DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-fffffff")), quality);
-            };
+             {
+                 await CaptureScreenLogic(Path.Combine(Options.ScreenshotOutputDirectory, DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-fffffff")), quality);
+             };
 
             CaptureScreenTimer.Interval = delayInMs;
             CaptureScreenTimer.Start();
@@ -45,11 +65,11 @@ namespace ScreenShoterHelper
         }
 
         private static async Task CaptureScreenLogic(string filePath, int quality)
-        {           
+        {
             await TakeScreenshot(filePath, quality);
         }
 
-      
+
 
     }
 }
