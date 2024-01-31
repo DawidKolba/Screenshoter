@@ -16,7 +16,6 @@
             if (disposing && (components != null))
             {
                 components.Dispose();
-                _shortcutManager.Dispose();
             }
             base.Dispose(disposing);
 
@@ -122,7 +121,7 @@
             removeoldPhotosCb.TabIndex = 9;
             removeoldPhotosCb.Text = "Auto removing old photos";
             removeoldPhotosCb.UseVisualStyleBackColor = true;
-            removeoldPhotosCb.CheckedChanged += checkBox1_CheckedChanged;
+            removeoldPhotosCb.CheckedChanged += DeleteOldPhotos_CheckedChanged;
             // 
             // moreInfoBtn
             // 

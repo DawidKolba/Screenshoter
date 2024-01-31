@@ -6,10 +6,8 @@ namespace ScreenShoterHelper
     {
         static System.Timers.Timer CaptureScreenTimer = new System.Timers.Timer();
 
-        public static async Task TakeScreenshot(string path, int quality)
-        {
-            if (!Directory.Exists(Options.ScreenshotOutputDirectory)) { Directory.CreateDirectory(Options.ScreenshotOutputDirectory); }
-
+        private static async Task TakeScreenshot(string path, int quality)
+        {           
             using (var capture = new ScreenCapture())
             {
                 await capture.CaptureScreens(path, quality);
@@ -61,15 +59,11 @@ namespace ScreenShoterHelper
             var dir = Path.Combine(Options.ScreenshotOutputDirectory);
             if (!Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-
         }
 
         private static async Task CaptureScreenLogic(string filePath, int quality)
         {
             await TakeScreenshot(filePath, quality);
         }
-
-
-
     }
 }

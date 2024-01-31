@@ -21,7 +21,7 @@ public class ShortcutManager
         _currentId = 0;
     }
 
-    public void RegisterShortcut(Keys key, Action action)
+    public void RegisterShortcut(Keys key, Action action, int id)
     {
         uint modifiers = 0;
 
@@ -44,14 +44,14 @@ public class ShortcutManager
         }
 
         _currentId++;
-        if (!RegisterHotKey(_windowHandle, _currentId, modifiers, (uint)key))
+        if (!RegisterHotKey(_windowHandle, id, modifiers, (uint)key))
         {
             string errorMessage = $"Cannot register provided shortcut: {key} with modifiers: {modifiers}!";
             _logger.Error(errorMessage);
             MessageBox.Show(errorMessage, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        Application.AddMessageFilter(new MessageFilter(_windowHandle, _currentId, action));
+        Application.AddMessageFilter(new MessageFilter(_windowHandle, id, action));
     }
 
     public void Dispose()
@@ -60,5 +60,5 @@ public class ShortcutManager
         {
             UnregisterHotKey(_windowHandle, i);
         }
-    }   
+    }
 }

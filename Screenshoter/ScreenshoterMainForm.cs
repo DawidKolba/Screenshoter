@@ -2,37 +2,57 @@ using Screenshoter.SystemHelper;
 using ScreenshoterForm.ScreenShoterHelper;
 using ScreenShoterHelper;
 using System.Configuration;
+using System.Runtime.InteropServices;
 
 namespace ScreenshoterForm
 {
     public partial class ScreenshoterMainForm : Form
     {
-        private ShortcutManager _shortcutManager;
-        private NotifyIcon trayIcon;
-        private ContextMenuStrip trayMenu;
+        [DllImport("user32.dll")]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+        [DllImport("user32.dll")]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        private const int HOTKEY_F11_ID = 1;
+        private const int HOTKEY_CTRL_H_ID = 2;
+        private const int HOTKEY_F8_ID = 3;
 
         public ScreenshoterMainForm()
         {
             InitializeComponent();
-            _shortcutManager = new ShortcutManager(this.Handle);
             deleteOldFilesPanel.Enabled = false; deleteOldFilesPanel.Visible = false;
-            TryRegisterShortcut(Keys.F11, StartSeriesCapture);
-            TryRegisterShortcut(Keys.Control | Keys.H, ToggleMainWindow);
-            TryRegisterShortcut(Keys.F8, StartAutomaticCapture);
-            trayMenu = new ContextMenuStrip();
-            trayMenu.Items.Add("Open", null, this.RestoreFromTray);
-            trayMenu.Items.Add("Close", null, this.ExitApplication);
-            trayIcon = new NotifyIcon()
-            {
-                Icon = new Icon("appicon.ico"),
-                ContextMenuStrip = trayMenu,
-                Visible = false
-            };
 
-            trayIcon.MouseDoubleClick += TrayIcon_MouseDoubleClick;
-            this.Resize += MainForm_Resize;
+            RegisterShortcuts();
             LoadConfig();
         }
+
+        private void RegisterShortcuts()
+        {
+            RegisterHotKey(this.Handle, HOTKEY_F11_ID, 0, (uint)Keys.F11);
+            RegisterHotKey(this.Handle, HOTKEY_CTRL_H_ID, 2 /* Ctrl */, (uint)Keys.H);
+            RegisterHotKey(this.Handle, HOTKEY_F8_ID, 0, (uint)Keys.F8);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == 0x0312) // WM_HOTKEY
+            {
+                switch (m.WParam.ToInt32())
+                {
+                    case HOTKEY_F11_ID:
+                        StartSeriesCapture();
+                        break;
+                    case HOTKEY_CTRL_H_ID:
+                        ToggleMainWindow();
+                        break;
+                    case HOTKEY_F8_ID:
+                        StartAutomaticCapture();
+                        break;
+                }
+            }
+            base.WndProc(ref m);
+        }
+
         private void MainForm_Resize(object sender, EventArgs e)
         {
             MainForm_Resize();
@@ -63,39 +83,24 @@ namespace ScreenshoterForm
         {
             if (WindowState != FormWindowState.Minimized)
             {
-                this.Hide();
-                trayIcon.Visible = true;
-                ShowInTaskbar = false;
+                this.Opacity = 0.0f;
+                this.WindowState = FormWindowState.Minimized;
             }
-        }
-
-        private void TrayIcon_MouseDoubleClick(object sender, MouseEventArgs e)
-        {
-            RestoreFromTray(sender, e);
-        }
-
-        private void RestoreFromTray(object sender, EventArgs e)
-        {
-            Show();
-            WindowState = FormWindowState.Normal;
-            trayIcon.Visible = false;
-            ShowInTaskbar = true;
+            else
+            {
+                this.Opacity = 1.0f;
+                this.WindowState = FormWindowState.Normal;
+            }
         }
 
         private void ExitApplication(object sender, EventArgs e)
         {
-            trayIcon.Visible = false;
             Application.Exit();
         }
 
         private async void StartSeriesCapture()
         {
-            ToggleMainWindow();
-            int countOfImages = int.Parse(CountOfImagesTb.Text);
-            int delayBetweenPhotos = int.Parse(delayBetweenThePhotos.Text);
-            int quality = int.Parse(qualityTextbox.Text);
-
-            await ScreenShoter.TakeMultipleScreenshots(countOfImages, delayBetweenPhotos, quality);
+            await ExecuteSeriesCapture();
         }
 
         private void ToggleMainWindow()
@@ -108,28 +113,10 @@ namespace ScreenshoterForm
             ToggleMainWindow();
         }
 
-        private void TryRegisterShortcut(Keys keys, Action action)
-        {
-            try
-            {
-                _shortcutManager.RegisterShortcut(keys, action);
-            }
-            catch (Exception ex)
-            {
-                _shortcutManager = new ShortcutManager(this.Handle);
-                _shortcutManager.RegisterShortcut(Keys.F12, StartSeriesCapture);
-                _shortcutManager.RegisterShortcut(Keys.Control | Keys.H, ToggleMainWindow);
-                _shortcutManager.RegisterShortcut(Keys.F8, StartAutomaticCapture);
-            }
-        }
-
         private async void takeSingleScreenshot_Click(object sender, EventArgs e)
         {
-            await ScreenShoter.TakeScreenshot(
-                   Path.Combine
-                       (Options.ScreenshotOutputDirectory, $"TestScreenshot_{DateTime.Now.ToString("yyyy-MM-dd___HH-mm-ss-ffffff")}"),
-                        int.Parse(qualityTextbox.Text)
-                       );
+            int quality = int.Parse(qualityTextbox.Text);
+            await ScreenShoter.TakeMultipleScreenshots(1, 0, quality);
         }
 
         private void startScreenshoting_Click(object sender, EventArgs e)
@@ -138,6 +125,22 @@ namespace ScreenshoterForm
                 int.Parse(qualityTextbox.Text),
                 int.Parse(delayBetweenThePhotos.Text)
                 );
+        }
+
+        private async Task ExecuteSeriesCapture()
+        {
+            try
+            {
+                int countOfImages = int.Parse(CountOfImagesTb.Text);
+                int delayBetweenPhotos = int.Parse(delayBetweenThePhotos.Text);
+                int quality = int.Parse(qualityTextbox.Text);
+
+                await ScreenShoter.TakeMultipleScreenshots(countOfImages, delayBetweenPhotos, quality);
+            }
+            catch (FormatException ex)
+            {
+                MessageBox.Show($"Invalid value\n{ex}");
+            }
         }
 
         private void moreInfoBtn_Click(object sender, EventArgs e)
@@ -161,7 +164,7 @@ namespace ScreenshoterForm
             MainForm_Resize(sender, e);
         }
 
-        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        private void DeleteOldPhotos_CheckedChanged(object sender, EventArgs e)
         {
             if (removeoldPhotosCb.Checked)
             {
@@ -186,11 +189,7 @@ namespace ScreenshoterForm
 
         private async void manualSeriesScreenshotBtn_Click(object sender, EventArgs e)
         {
-            int countOfImages = int.Parse(CountOfImagesTb.Text);
-            int delayBetweenPhotos = int.Parse(delayBetweenThePhotos.Text);
-            int quality = int.Parse(qualityTextbox.Text);
-
-            await ScreenShoter.TakeMultipleScreenshots(countOfImages, delayBetweenPhotos, quality);
+            await ExecuteSeriesCapture();
         }
 
         private void saveCfg_Click(object sender, EventArgs e)
